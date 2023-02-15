@@ -100,10 +100,10 @@ class MMA845x:
         """
 
         ## The I2C driver which was created by the code which called this
-        self.i2c = i2c
+        self._i2c = i2c
 
         ## The I2C address at which the accelerometer is located
-        self.addr = address
+        self._addr = address
 
         # Request the WHO_AM_I device ID byte from the accelerometer
         self._dev_id = ord (i2c.mem_read (1, address, WHO_AM_I))
@@ -130,9 +130,9 @@ class MMA845x:
         """
 
         if self._works:
-            reg1 = ord (self.i2c.mem_read (1, self.addr, CTRL_REG1))
+            reg1 = ord (self._i2c.mem_read (1, self._addr, CTRL_REG1))
             reg1 |= 0x01
-            self.i2c.mem_write (chr (reg1), self.addr, CTRL_REG1)
+            self._i2c.mem_write (chr (reg1), self._addr, CTRL_REG1)
 
 
     def standby (self):
@@ -150,9 +150,10 @@ class MMA845x:
         """! Get the X acceleration from the accelerometer in A/D bits and 
         return it.
         @return The measured X acceleration in A/D conversion bits """
-
-        print ('MMA845x clueless about X acceleration')
-        return 0
+        data = 2
+        memaddr = OUT_X_MSB
+        xbytes = self._i2c.mem_read(data, self._addr, memaddr)
+        return xbytes
 
 
     def get_ay_bits (self):
@@ -177,9 +178,17 @@ class MMA845x:
         """! Get the X acceleration from the accelerometer in g's, assuming
         that the accelerometer was correctly calibrated at the factory.
         @return The measured X acceleration in g's """
+        xbytes = self.get_ax_bits()
+        x_int = int.from_bytes(xbytes,'big',True)
+        # correcting negative numbers
+        if x_int >= 2**15:
+            x_int -= 2**16
+        x_int = int.from_bytes(xbytes,'big',True)
+        # getting to accel
+        x_accel = x_int/17000
 
-        print ('MMA845x uncalibrated X')
-        return 0
+        
+        return x_accel
 
 
     def get_ay (self):
@@ -219,9 +228,9 @@ class MMA845x:
         if not self._works:
             return ('No working MMA845x at I2C address ' + str (self.addr))
         else:
-            reg1 = ord (self.i2c.mem_read (1, self.addr, CTRL_REG1))
+            reg1 = ord (self.i2c.mem_read (1, self._addr, CTRL_REG1))
             diag_str = 'MMA845' + str (self._dev_id >> 4) \
-                + ': I2C address ' + hex (self.addr) \
+                + ': I2C address ' + hex (self._addr) \
                 + ', Range=' + str (1 << (self._range + 1)) + 'g, Mode='
             diag_str += 'active' if reg1 & 0x01 else 'standby'
 
